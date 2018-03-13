@@ -57,8 +57,6 @@ parser.add_argument('--dims', type=int, default=2048,
                     choices=list(InceptionV3.BLOCK_INDEX_BY_DIM),
                     help=('Dimensionality of Inception features to use. '
                           'By default, uses pool3 features'))
-parser.add_argument('-c', '--gpu', default='', type=str,
-                    help='GPU to use (leave blank for CPU only)')
 
 
 def get_activations(images, model, batch_size=64, dims=2048,
@@ -256,7 +254,7 @@ def calculate_fid_given_paths(pathG, pathD, batch_size, cuda, dims):
 
     block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[dims]
 
-    model = InceptionV3([block_idx])
+    model = torch.nn.DataParallel(InceptionV3([block_idx]))
     if cuda:
         model.cuda()
 
@@ -271,11 +269,10 @@ def calculate_fid_given_paths(pathG, pathD, batch_size, cuda, dims):
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
     fid_value = calculate_fid_given_paths(args.pathG,
                                           args.pathD,
                                           args.batch_size,
-                                          args.gpu != '',
+                                          True,
                                           args.dims)
     print('FID: ', fid_value)

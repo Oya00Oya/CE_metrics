@@ -4,7 +4,8 @@ import os
 import os.path
 import random
 import numbers
-
+import numpy as np
+from scipy.misc import fromimage
 import torch.utils.data as data
 import torchvision.transforms as transforms
 from PIL import Image
@@ -89,7 +90,7 @@ class ImageFolder(data.Dataset):
         if random.random() < 0.5:
             Simg = Simg.transpose(Image.FLIP_LEFT_RIGHT)
 
-        return Simg
+        return fromimage(Simg).astype(np.float32)
 
     def __len__(self):
         return len(self.imgs)
@@ -98,13 +99,7 @@ class ImageFolder(data.Dataset):
 def CreateDataLoader(opt):
     random.seed(opt.manualSeed)
 
-    STrans = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-    ])
-
     dataset = ImageFolder(root=opt.dataroot,
-                          stransform=STrans
                           )
 
     assert dataset

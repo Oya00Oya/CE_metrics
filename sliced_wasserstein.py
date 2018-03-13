@@ -92,7 +92,7 @@ def pyr_up(minibatch):  # matches cv2.pyrUp()
 
 def generate_laplacian_pyramid(minibatch, num_levels):
     pyramid = [np.float32(minibatch)]
-    for i in range(1, num_levels):
+    for _ in range(1, num_levels):
         pyramid.append(pyr_down(pyramid[-1]))
         pyramid[-2] -= pyr_up(pyramid[-1])
     return pyramid

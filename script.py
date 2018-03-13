@@ -11,8 +11,6 @@ import numpy as np
 #import tensorflow as tf
 
 
-
-
 # ----------------------------------------------------------------------------
 # Evaluate one or more metrics for a previous training run.
 # To run, uncomment one of the appropriate lines in config.py and launch train.py.

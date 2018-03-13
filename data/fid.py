@@ -81,6 +81,7 @@ class ImageFolder(data.Dataset):
         self.root = root
         self.imgs = imgs
         self.corp = RandomCrop(299)
+        self.to_tensor = transforms.ToTensor()
 
     def __getitem__(self, index):
         fname = self.imgs[index]
@@ -90,18 +91,18 @@ class ImageFolder(data.Dataset):
         if random.random() < 0.5:
             Simg = Simg.transpose(Image.FLIP_LEFT_RIGHT)
 
-        return fromimage(Simg).astype(np.float32)
+        return self.to_tensor(Simg)  # fromimage(Simg).astype(np.float32)
 
     def __len__(self):
         return len(self.imgs)
 
 
-def CreateDataLoader(opt):
-    random.seed(opt.manualSeed)
+def CreateDataLoader(dataroot, batchSize, manualSeed):
+    random.seed(manualSeed)
 
-    dataset = ImageFolder(root=opt.dataroot)
+    dataset = ImageFolder(root=dataroot)
 
     assert dataset
 
-    return data.DataLoader(dataset, batch_size=1,
-                           shuffle=True, num_workers=2, drop_last=False)
+    return data.DataLoader(dataset, batch_size=batchSize,
+                           shuffle=True, num_workers=4, drop_last=False)

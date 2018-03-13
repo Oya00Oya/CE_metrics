@@ -37,7 +37,7 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
 import numpy as np
 import torch
-from data.fid import ImageFolder
+from data.fid import CreateDataLoader
 from scipy import linalg
 from torch.autograd import Variable
 from torch.nn.functional import adaptive_avg_pool2d
@@ -57,65 +57,6 @@ parser.add_argument('--dims', type=int, default=2048,
                     choices=list(InceptionV3.BLOCK_INDEX_BY_DIM),
                     help=('Dimensionality of Inception features to use. '
                           'By default, uses pool3 features'))
-
-
-def get_activations(images, model, batch_size=64, dims=2048,
-                    cuda=False, verbose=False):
-    """Calculates the activations of the pool_3 layer for all images.
-
-    Params:
-    -- images      : Numpy array of dimension (n_images, 3, hi, wi). The values
-                     must lie between 0 and 1.
-    -- model       : Instance of inception model
-    -- batch_size  : the images numpy array is split into batches with
-                     batch size batch_size. A reasonable batch size depends
-                     on the hardware.
-    -- dims        : Dimensionality of features returned by Inception
-    -- cuda        : If set to True, use GPU
-    -- verbose     : If set to True and parameter out_step is given, the number
-                     of calculated batches is reported.
-    Returns:
-    -- A numpy array of dimension (num images, dims) that contains the
-       activations of the given tensor when feeding inception with the
-       query tensor.
-    """
-    model.eval()
-
-    d0 = images.shape[0]
-    if batch_size > d0:
-        print(('Warning: batch size is bigger than the data size. '
-               'Setting batch size to data size'))
-        batch_size = d0
-
-    n_batches = d0 // batch_size
-    n_used_imgs = n_batches * batch_size
-
-    pred_arr = np.empty((n_used_imgs, dims))
-    for i in range(n_batches):
-        if verbose:
-            print('\rPropagating batch %d/%d' % (i + 1, n_batches),
-                  end='', flush=True)
-        start = i * batch_size
-        end = start + batch_size
-
-        batch = torch.from_numpy(images[start:end]).type(torch.FloatTensor)
-        batch = Variable(batch)
-        if cuda:
-            batch = batch.cuda()
-        with torch.no_grad():
-            pred = model(batch)[0]
-
-        # If model output is not scalar, apply global spatial average pooling.
-        # This happens if you choose a dimensionality not equal 2048.
-        if pred.shape[2] != 1 or pred.shape[3] != 1:
-            pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
-
-        pred_arr[start:end] = pred.cpu().data.numpy().reshape(batch_size, -1)
-
-    if verbose:
-        print(' done')
-
-    return pred_arr
 
 
 def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
@@ -175,27 +116,39 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
             np.trace(sigma2) - 2 * tr_covmean)
 
 
-def calculate_activation_statistics(images, model, batch_size=64,
+def calculate_activation_statistics(dataloader, model, batch_size=64,
                                     dims=2048, cuda=False, verbose=True):
-    """Calculation of the statistics used by the FID.
-    Params:
-    -- images      : Numpy array of dimension (n_images, 3, hi, wi). The values
-                     must lie between 0 and 1.
-    -- model       : Instance of inception model
-    -- batch_size  : The images numpy array is split into batches with
-                     batch size batch_size. A reasonable batch size
-                     depends on the hardware.
-    -- dims        : Dimensionality of features returned by Inception
-    -- cuda        : If set to True, use GPU
-    -- verbose     : If set to True and parameter out_step is given, the
-                     number of calculated batches is reported.
-    Returns:
-    -- mu    : The mean over samples of the activations of the pool_3 layer of
-               the inception model.
-    -- sigma : The covariance matrix of the activations of the pool_3 layer of
-               the inception model.
-    """
-    act = get_activations(images, model, batch_size, dims, cuda, verbose)
+    model.eval()
+
+    n_used_imgs = len(dataloader.dataset)
+
+    act = np.empty((n_used_imgs, dims))
+
+    data_iter = iter(dataloader)
+    for i in len(dataloader):
+        if verbose:
+            print('\rPropagating batch %d/%d' % (i + 1, len(dataloader)),
+                  end='', flush=True)
+        start = i * batch_size
+        end = start + batch_size
+
+        batch = data_iter.next()
+        batch = Variable(batch)
+        if cuda:
+            batch = batch.cuda()
+        with torch.no_grad():
+            pred = model(batch)[0]
+
+        # If model output is not scalar, apply global spatial average pooling.
+        # This happens if you choose a dimensionality not equal 2048.
+        if pred.shape[2] != 1 or pred.shape[3] != 1:
+            pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
+
+            act[start:end] = pred.cpu().data.numpy().squeeze()
+
+    if verbose:
+        print(' done')
+
     mu = np.mean(act, axis=0)
     sigma = np.cov(act, rowvar=False)
     return mu, sigma
@@ -207,17 +160,9 @@ def _compute_statistics_of_pathD(path, model, batch_size, dims, cuda):
         m, s = f['mu'][:], f['sigma'][:]
         f.close()
     else:
-        data = ImageFolder(path)
+        data = CreateDataLoader(path, batch_size, 2333)
 
-        imgs = np.array([data[i] for i in range(len(data))])
-
-        # Bring images to shape (B, 3, H, W)
-        imgs = imgs.transpose((0, 3, 1, 2))
-
-        # Rescale images to be between 0 and 1
-        imgs /= 255
-
-        m, s = calculate_activation_statistics(imgs, model, batch_size,
+        m, s = calculate_activation_statistics(data, model, batch_size,
                                                dims, cuda)
 
     return m, s
@@ -229,17 +174,9 @@ def _compute_statistics_of_pathG(path, model, batch_size, dims, cuda):
         m, s = f['mu'][:], f['sigma'][:]
         f.close()
     else:
-        data = ImageFolder(path)
+        data = CreateDataLoader(path, batch_size, 2333)
 
-        imgs = np.array([data[i] for i in range(len(data))] + [data[i] for i in range(len(data))])
-
-        # Bring images to shape (B, 3, H, W)
-        imgs = imgs.transpose((0, 3, 1, 2))
-
-        # Rescale images to be between 0 and 1
-        imgs /= 255
-
-        m, s = calculate_activation_statistics(imgs, model, batch_size,
+        m, s = calculate_activation_statistics(data, model, batch_size,
                                                dims, cuda)
 
     return m, s

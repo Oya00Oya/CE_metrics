@@ -99,8 +99,7 @@ class ImageFolder(data.Dataset):
 def CreateDataLoader(opt):
     random.seed(opt.manualSeed)
 
-    dataset = ImageFolder(root=opt.dataroot,
-                          )
+    dataset = ImageFolder(root=opt.dataroot)
 
     assert dataset
 

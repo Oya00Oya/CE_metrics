@@ -176,7 +176,7 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
 
 
 def calculate_activation_statistics(images, model, batch_size=64,
-                                    dims=2048, cuda=False, verbose=False):
+                                    dims=2048, cuda=False, verbose=True):
     """Calculation of the statistics used by the FID.
     Params:
     -- images      : Numpy array of dimension (n_images, 3, hi, wi). The values

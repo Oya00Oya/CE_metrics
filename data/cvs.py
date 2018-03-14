@@ -80,29 +80,25 @@ class ImageFolder(data.Dataset):
             raise (RuntimeError("Found 0 images in folders."))
         self.root = root
         self.imgs = imgs
-        self.corp = RandomCrop(299)
         self.to_tensor = transforms.ToTensor()
+        self.norm = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 
     def __getitem__(self, index):
         fname = self.imgs[index]
         Simg = color_loader(os.path.join(self.root, fname))
-        Simg = resize_by(Simg, 299)
-        Simg = self.corp(Simg)
-        if random.random() < 0.5:
-            Simg = Simg.transpose(Image.FLIP_LEFT_RIGHT)
 
-        return self.to_tensor(Simg)  # fromimage(Simg).astype(np.float32)
+        return self.norm(self.to_tensor(Simg))  # fromimage(Simg).astype(np.float32)
 
     def __len__(self):
         return len(self.imgs)
 
 
-def CreateDataLoader(dataroot, batchSize, manualSeed):
+def CreateDataLoader(dataroot, manualSeed=2333):
     random.seed(manualSeed)
 
     dataset = ImageFolder(root=dataroot)
 
     assert dataset
 
-    return data.DataLoader(dataset, batch_size=batchSize,
-                           shuffle=True, num_workers=8, drop_last=False)
+    return data.DataLoader(dataset, batch_size=1,
+                           shuffle=True, num_workers=4, drop_last=False)

@@ -108,7 +108,7 @@ def reconstruct_laplacian_pyramid(pyramid):
 # ----------------------------------------------------------------------------
 
 class API:
-    def __init__(self, num_images, image_shape, image_dtype, minibatch_size):
+    def __init__(self, image_shape):
         self.nhood_size = 7
         self.nhoods_per_image = 128
         self.dir_repeats = 4

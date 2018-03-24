@@ -74,20 +74,19 @@ class RandomCrop(object):
 
 
 class ImageFolder(data.Dataset):
-    def __init__(self, root):
+    def __init__(self, root, transform):
         imgs = make_dataset(root)
         if len(imgs) == 0:
             raise (RuntimeError("Found 0 images in folders."))
         self.root = root
         self.imgs = imgs
-        self.to_tensor = transforms.ToTensor()
-        self.norm = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        self.transform = transform
 
     def __getitem__(self, index):
         fname = self.imgs[index]
         Simg = color_loader(os.path.join(self.root, fname))
 
-        return self.norm(self.to_tensor(Simg))  # fromimage(Simg).astype(np.float32)
+        return self.transform(Simg)  # fromimage(Simg).astype(np.float32)
 
     def __len__(self):
         return len(self.imgs)
@@ -96,7 +95,14 @@ class ImageFolder(data.Dataset):
 def CreateDataLoader(dataroot, manualSeed=2333):
     random.seed(manualSeed)
 
-    dataset = ImageFolder(root=dataroot)
+    Trans = transforms.Compose([
+        transforms.Scale(256, Image.BICUBIC),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
+
+    dataset = ImageFolder(root=dataroot,
+                          transform=Trans)
 
     assert dataset
 

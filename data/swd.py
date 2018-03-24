@@ -52,6 +52,11 @@ def is_image_file(filename):
     return any(filename.endswith(extension) for extension in IMG_EXTENSIONS)
 
 
+def resize_by(img, side_min):
+    return img.resize((int(img.size[0] / min(img.size) * side_min), int(img.size[1] / min(img.size) * side_min)),
+                      Image.BICUBIC)
+
+
 def make_dataset(dir):
     images = []
 
@@ -60,7 +65,7 @@ def make_dataset(dir):
             if is_image_file(fname):
                 path = os.path.join(root, fname)
                 images.append(path)
-    return images
+    return random.sample(images, 2272)
 
 
 def color_loader(path):
@@ -79,6 +84,7 @@ class ImageFolder(data.Dataset):
     def __getitem__(self, index):
         fpath = self.imgs[index]
         Cimg = color_loader(fpath)
+        Cimg = resize_by(Cimg, 512)
         Cimg = RandomCrop(512)(Cimg)
         if random.random() < 0.5:
             Cimg = Cimg.transpose(Image.FLIP_LEFT_RIGHT)
@@ -89,12 +95,12 @@ class ImageFolder(data.Dataset):
         return len(self.imgs)
 
 
-def CreateDataLoader(opt):
-    random.seed(opt.manualSeed)
+def CreateDataLoader(droot, batchSize):
+    random.seed(2333)
 
-    dataset = ImageFolder(root=opt.dataroot)
+    dataset = ImageFolder(root=droot)
 
     assert dataset
 
-    return data.DataLoader(dataset, batch_size=opt.batchSize,
-                           shuffle=True, num_workers=int(opt.workers), drop_last=False)
+    return data.DataLoader(dataset, batch_size=batchSize,
+                           shuffle=True, num_workers=int(4), drop_last=False)

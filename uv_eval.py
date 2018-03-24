@@ -41,3 +41,5 @@ uv_cums = torch.cat(uv_cums, 0)
 
 print(f'final uv var score: {cal_tvar(uv_cums)}')
 
+# uv var score(V_C): 0.007761820685118437
+

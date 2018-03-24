@@ -146,37 +146,75 @@ def calculate_activation_statistics(dataloader, model, batch_size=64,
             pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
 
         act[start:end] = pred.cpu().data.numpy().squeeze()
-    # print(act[66])
-    # ######################
-    # act2 = np.empty((n_used_imgs, dims))
-    #
-    # data_iter = iter(dataloader)
-    # for i in range(len(dataloader)):
-    #     if verbose:
-    #         print('\rPropagating batch %d/%d' % (i + 1, len(dataloader)),
-    #               end='', flush=True)
-    #     start = i * batch_size
-    #     end = start + batch_size
-    #
-    #     batch = data_iter.next()
-    #     batch = Variable(batch, volatile=True)
-    #     if cuda:
-    #         batch = batch.cuda()
-    #
-    #     pred = model(batch)[0]
-    #
-    #     # If model output is not scalar, apply global spatial average pooling.
-    #     # This happens if you choose a dimensionality not equal 2048.
-    #     if pred.shape[2] != 1 or pred.shape[3] != 1:
-    #         pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
-    #
-    #     act2[start:end] = pred.cpu().data.numpy().squeeze()
-    # print(act2[66])
 
     if verbose:
         print(' done')
 
-    # act = np.concatenate((act, act2), 0)
+    mu = np.mean(act, axis=0)
+    sigma = np.cov(act, rowvar=False)
+    return mu, sigma
+
+
+def calculate_activation_statisticsG(dataloader, model, batch_size=64,
+                                    dims=2048, cuda=False, verbose=True):
+    model.eval()
+
+    n_used_imgs = len(dataloader.dataset)
+
+    act = np.empty((n_used_imgs, dims))
+
+    data_iter = iter(dataloader)
+    data_iter2 = iter(dataloader)
+
+    for i in range(len(dataloader)):
+        if verbose:
+            print('\rPropagating batch %d/%d' % (i + 1, len(dataloader)),
+                  end='', flush=True)
+        start = i * batch_size
+        end = start + batch_size
+
+        batch = data_iter.next()
+        batch = Variable(batch, volatile=True)
+
+        if cuda:
+            batch = batch.cuda()
+
+        pred = model(batch)[0]
+
+        # If model output is not scalar, apply global spatial average pooling.
+        # This happens if you choose a dimensionality not equal 2048.
+        if pred.shape[2] != 1 or pred.shape[3] != 1:
+            pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
+
+        act[start:end] = pred.cpu().data.numpy().squeeze()
+    ######################
+    act2 = np.empty((n_used_imgs, dims))
+
+    for i in range(len(dataloader)):
+        if verbose:
+            print('\rPropagating batch %d/%d' % (i + 1, len(dataloader)),
+                  end='', flush=True)
+        start = i * batch_size
+        end = start + batch_size
+
+        batch = data_iter2.next()
+        batch = Variable(batch, volatile=True)
+        if cuda:
+            batch = batch.cuda()
+
+        pred = model(batch)[0]
+
+        # If model output is not scalar, apply global spatial average pooling.
+        # This happens if you choose a dimensionality not equal 2048.
+        if pred.shape[2] != 1 or pred.shape[3] != 1:
+            pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
+
+        act2[start:end] = pred.cpu().data.numpy().squeeze()
+
+    if verbose:
+        print(' done')
+
+    act = np.concatenate((act, act2), 0)
 
     mu = np.mean(act, axis=0)
     sigma = np.cov(act, rowvar=False)
@@ -205,7 +243,7 @@ def _compute_statistics_of_pathG(path, model, batch_size, dims, cuda):
     else:
         data = CreateDataLoader(path, batch_size, 2333)
 
-        m, s = calculate_activation_statistics(data, model, batch_size,
+        m, s = calculate_activation_statisticsG(data, model, batch_size,
                                                dims, cuda)
 
     return m, s
@@ -238,9 +276,11 @@ if __name__ == '__main__':
 
     fid_value = 0
     for _ in range(5):
-        fid_value += calculate_fid_given_paths(args.pathG,
-                                               args.pathD,
-                                               args.batch_size,
-                                               True,
-                                               args.dims)
+        fid = calculate_fid_given_paths(args.pathG,
+                                        args.pathD,
+                                        args.batch_size,
+                                        True,
+                                        args.dims)
+        print('FID: ', fid)
+        fid_value += fid
     print('FID: ', fid_value / 5)
